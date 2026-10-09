@@ -2,6 +2,8 @@
 
 为 Claude Haiku 5.5 修正思考参数的 Magpie **网关中间件插件**。零依赖，无需构建，支持直接从 GitHub 安装。只匹配 Haiku 5.5，包括 OpenDesign 实际使用的 `claude-haiku-5.5`、标准名称 `claude-haiku-5-5` 以及带 provider 前缀的名称。
 
+**当前尚未完成 OpenDesign 的“保留思考、自动转换”修复。** 入口规范化已实现，但独立直连 OpenDesign 的三种接口开启思考仍返回 400；关闭思考的兼容测试不能作为此目标的验收。详见 [独立复现及阻塞说明](./OPENDESIGN-THINKING-BLOCKER.md)。
+
 ## 你的 OpenDesign 报错：安装方法
 
 ```text
@@ -22,7 +24,7 @@ magpie plugin add github:ezdemo/magpie-haiku55-thinking
 | `adaptive`（默认） | 按 Anthropic 规范修正入口参数，保留思考强度选择 | 无法修复 OpenDesign 服务端再次生成 `enabled` 的行为 |
 | `disabled` | OpenDesign 当前可用的临时兼容模式；移除 OpenAI 思考控制，原生请求显式关闭思考 | **不提供可调思考强度**；省略参数时，最终模型是否思考取决于上游默认行为 |
 
-**当前 OpenDesign 建议先启用临时兼容模式：**
+**仅在愿意暂时放弃思考控制时，可启用兼容模式；它不满足保留思考的要求：**
 
 ```sh
 magpie plugin options magpie-haiku55-thinking '{"mode":"disabled"}'

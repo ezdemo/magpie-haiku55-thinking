@@ -1,5 +1,7 @@
 # Validation — 2026-10-09
 
+**The user's required outcome, preserving thinking with automatic conversion, remains blocked.** A subsequent independent acceptance test bypassed Magpie entirely: all three official OpenDesign protocols returned HTTP 400 at high effort, with no reasoning evidence. See [the direct reproduction](./OPENDESIGN-THINKING-BLOCKER.md) and `npm run test:thinking:live`. The successful disabled-mode checks below are not evidence that this requirement is fulfilled.
+
 Environment: Windows, Node.js v24.13.1, Magpie CLI v0.1.1137.
 Magpie binary SHA-256: `22f6e6a0cf84de16ea0d155cb362e7b4f701f1e579cfe48faf18e440572700a1`.
 
