@@ -1,0 +1,20 @@
+{
+  "name": "magpie-haiku55-thinking",
+  "version": "0.1.0",
+  "description": "Magpie gateway middleware for Claude Haiku 5.5 thinking parameters",
+  "type": "module",
+  "files": ["haiku55.middleware.js", "README.md", "LICENSE"],
+  "license": "MIT",
+  "keywords": ["magpie", "magpie-plugin", "middleware", "claude", "haiku", "thinking"],
+  "repository": {"type": "git", "url": "git+https://github.com/ezdemo/magpie-haiku55-thinking.git"},
+  "magpie": {
+    "middleware": "./haiku55.middleware.js",
+    "options": {"mode": "adaptive", "defaultEffort": "medium", "removeSampling": true}
+  },
+  "scripts": {
+    "check": "node --check haiku55.middleware.js",
+    "test": "node --test test/*.test.mjs",
+    "test:gateway": "node scripts/test-gateway.mjs"
+  },
+  "engines": {"node": ">=20"}
+}
