@@ -7,7 +7,7 @@ Magpie binary SHA-256: `22f6e6a0cf84de16ea0d155cb362e7b4f701f1e579cfe48faf18e440
 
 - `npm run check`: passed.
 - `npm test`: 37 passed, 0 failed.
-- `npm pack --dry-run`: middleware file, package manifest, README and license included; no dependencies or build required.
+- `npm pack --dry-run`: middleware file, package manifest, README, validation record and license included; no dependencies or build required.
 - Packaged middleware loaded by Magpie's actual moejs engine: passed.
 - Anthropic native `enabled` → `adaptive`, effort preserved: passed with both streaming and non-streaming replies.
 - Chat `ultra` → `max`, native relay extensions: passed.
