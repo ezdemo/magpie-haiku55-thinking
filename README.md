@@ -1,8 +1,56 @@
-# Magpie Haiku 5.5 Thinking
+# Magpie OpenDesign Compatible Fix
+
+Magpie gateway middleware that keeps Claude Haiku 5.5 working on Open Design
+and repairs Codex's client tool-search history.
+
+**Fixed (2026-10-11):** the relay refuses any OpenAI `reasoning` object and any
+Anthropic `thinking` block but accepts `output_config.effort`. The middleware
+rewrites the Responses request to ask with `output_config`, so thinking is
+preserved instead of turned off. It also rewrites Codex's client
+`tool_search_call` / `tool_search_output` history, which the relay
+mis-serializes during compaction. See
+[the fix and its boundary](./OPENDESIGN-THINKING-BLOCKER.md).
+
+## Install
+
+```sh
+magpie plugin add github:HachinRo/magpie-opendesign-compatible-fix
+```
+
+The Anthropic `/v1/messages` and Chat `/v1/chat/completions` clients still run
+with thinking off: Magpie rebuilds those requests and drops a client's
+`output_config` before the relay, so middleware cannot carry thinking there.
+Set `{"mode":"disabled"}` to force thinking off everywhere (the previous
+workaround); the default `adaptive` mode preserves thinking on the Responses
+path.
+
+### Options
+
+```json
+{
+  "mode": "adaptive",
+  "defaultEffort": "medium",
+  "removeSampling": true,
+  "toolSearchHistory": true,
+  "models": []
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `mode` | `adaptive` (default) or `disabled` |
+| `effort` | optional; forces the effort |
+| `defaultEffort` | effort when the client asks none; default `medium` |
+| `removeSampling` | default `true`; drop `temperature`, `top_p`, `top_k` |
+| `toolSearchHistory` | default `true`; rewrite Codex client tool-search history |
+| `models` | extra full model ids to match |
+
+See [VALIDATION.md](./VALIDATION.md) for the dated test record.
+
 
 为 Claude Haiku 5.5 修正思考参数的 Magpie **网关中间件插件**。零依赖，无需构建，支持直接从 GitHub 安装。只匹配 Haiku 5.5，包括 OpenDesign 实际使用的 `claude-haiku-5.5`、标准名称 `claude-haiku-5-5` 以及带 provider 前缀的名称。
 
-**当前尚未完成 OpenDesign 的“保留思考、自动转换”修复。** 入口规范化已实现，但独立直连 OpenDesign 的三种接口开启思考仍返回 400；关闭思考的兼容测试不能作为此目标的验收。详见 [独立复现及阻塞说明](./OPENDESIGN-THINKING-BLOCKER.md)。
+**2026-10-11 更新：** Responses 路径已保留思考——把 `reasoning` 改写为 `output_config.effort`，OpenDesign 返回 200 和带签名的思考项。Anthropic `/v1/messages` 与 Chat `/v1/chat/completions` 由 Magpie 重建请求，无法携带 `output_config`，因此这两条路径仍以关闭思考的方式返回 200（不再报错）。详见 [修复与边界说明](./OPENDESIGN-THINKING-BLOCKER.md)。
 
 ## 你的 OpenDesign 报错：安装方法
 
@@ -14,7 +62,7 @@ Use "thinking.type.adaptive" and "output_config.effort" to control thinking beha
 **安装在 OpenDesign 所在的远端 Magpie。** 如果错误前面有 `Remote magpie:`，只安装在客户端不能保证远端转换后的参数正确。
 
 ```sh
-magpie plugin add github:ezdemo/magpie-haiku55-thinking
+magpie plugin add github:HachinRo/magpie-opendesign-compatible-fix
 ```
 
 2026-10-09 的实测发现：OpenDesign 的 `claude-haiku-5.5` 接口即使收到原生 `thinking: {"type":"adaptive"}` 和 `output_config.effort`，仍可能返回相同的 `enabled` 错误；Chat 的 `reasoning_effort` 还出现了 502。因此，本插件提供两种模式：
@@ -24,10 +72,10 @@ magpie plugin add github:ezdemo/magpie-haiku55-thinking
 | `adaptive`（默认） | 按 Anthropic 规范修正入口参数，保留思考强度选择 | 无法修复 OpenDesign 服务端再次生成 `enabled` 的行为 |
 | `disabled` | OpenDesign 当前可用的临时兼容模式；移除 OpenAI 思考控制，原生请求显式关闭思考 | **不提供可调思考强度**；省略参数时，最终模型是否思考取决于上游默认行为 |
 
-**仅在愿意暂时放弃思考控制时，可启用兼容模式；它不满足保留思考的要求：**
+**仅在确实需要关闭思考时，可使用 `disabled`：**
 
 ```sh
-magpie plugin options magpie-haiku55-thinking '{"mode":"disabled"}'
+magpie plugin options magpie-opendesign-compatible-fix '{"mode":"disabled"}'
 ```
 
 如果终端对 JSON 引号的处理不同，也可以打开远端 Magpie 的「Plugins → Installed → 本插件 → Options」，保存：
@@ -36,12 +84,12 @@ magpie plugin options magpie-haiku55-thinking '{"mode":"disabled"}'
 {"mode":"disabled"}
 ```
 
-这个模式已通过真实 Magpie v0.1.1137 的协议转换测试。2026-10-09 使用同一份打包中间件，经 Anthropic Messages、Chat Completions、Responses 三种入口调用真实 OpenDesign Chat 上游，**全部返回 HTTP 200 和可见回复**，且上游不再收到触发旧转换的 `reasoning_effort`。完整验证结果见 [VALIDATION.md](./VALIDATION.md)。
+2026-10-11 在官方 raw Magpie v0.1.1185 上复测：插件 `adaptive`（默认）下，Responses 路径各档 effort 均返回 200 和思考项，Anthropic/Chat 路径返回 200（思考关闭），Codex 客户端 tool-search 历史 200；关闭插件时同一请求 502/400。完整验证结果见 [VALIDATION.md](./VALIDATION.md)。
 
-待 OpenDesign 修复服务端转换后，恢复标准模式：
+如需恢复保留思考的默认模式：
 
 ```sh
-magpie plugin options magpie-haiku55-thinking '{"mode":"adaptive"}'
+magpie plugin options magpie-opendesign-compatible-fix '{"mode":"adaptive"}'
 ```
 
 ## 标准 adaptive 模式
@@ -74,7 +122,7 @@ Anthropic 请求修正示例：
 
 中间件拿到的是**客户端协议的请求**。Anthropic 使用 `output_config.effort`，Chat 使用 `reasoning_effort`，Responses 使用 `reasoning.effort`。Chat 另外带上原生 `thinking` / `output_config` 扩展，以兼容支持透传的 relay。
 
-**协议转换限制：** Magpie 的 Responses → Chat 转换会丢弃额外的原生 `thinking` / `output_config` 字段。纯入口中间件不能在转换后拦截或修正供应商请求；不要把入口单元测试通过当作 OpenDesign 的 adaptive 思考已恢复。`disabled` 模式会删除 Responses 的整个 `reasoning` 对象，包括摘要设置，因为空对象也可能触发 Magpie 再生成思考配置。OpenDesign 的完整 adaptive 支持仍需要其服务端正确处理 Haiku 5.5。
+**协议转换限制：** Magpie 会重建 Anthropic `/v1/messages` 与 Chat `/v1/chat/completions` 请求体并丢弃其中的 `output_config`，纯入口中间件无法在重建后拦截，因此这两条路径以关闭思考的方式返回。保留思考的效果只在 Responses 路径（Codex、OpenAI SDK 等）成立。
 
 ## Options
 

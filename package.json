@@ -1,18 +1,18 @@
 {
-  "name": "magpie-haiku55-thinking",
+  "name": "magpie-opendesign-compatible-fix",
   "version": "0.1.0",
-  "description": "Magpie gateway middleware for Claude Haiku 5.5 thinking parameters",
+  "description": "Magpie gateway middleware compatibility fix for Open Design (Haiku 5.5 thinking) and Codex tool-search history",
   "type": "module",
-  "files": ["haiku55.middleware.js", "README.md", "VALIDATION.md", "OPENDESIGN-THINKING-BLOCKER.md", "LICENSE"],
+  "files": ["opendesign-compatible-fix.middleware.js", "README.md", "VALIDATION.md", "OPENDESIGN-THINKING-BLOCKER.md", "LICENSE"],
   "license": "MIT",
   "keywords": ["magpie", "magpie-plugin", "middleware", "claude", "haiku", "thinking"],
-  "repository": {"type": "git", "url": "git+https://github.com/ezdemo/magpie-haiku55-thinking.git"},
+  "repository": {"type": "git", "url": "git+https://github.com/HachinRo/magpie-opendesign-compatible-fix.git"},
   "magpie": {
-    "middleware": "./haiku55.middleware.js",
+    "middleware": "./opendesign-compatible-fix.middleware.js",
     "options": {"mode": "adaptive", "defaultEffort": "medium", "removeSampling": true}
   },
   "scripts": {
-    "check": "node --check haiku55.middleware.js",
+    "check": "node --check opendesign-compatible-fix.middleware.js",
     "test": "node --test test/*.test.mjs",
     "test:gateway": "node scripts/test-gateway.mjs",
     "test:thinking:live": "node scripts/test-thinking-live.mjs --live"

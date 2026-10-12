@@ -1,7 +1,7 @@
 // Real Magpie/moejs + local mock upstream. No vendor keys or real account data.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir, homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const bin = process.env.MAGPIE_BIN;
 if (!bin) throw new Error("Set MAGPIE_BIN to a Magpie CLI executable first.");
-const root = await mkdtemp(join(tmpdir(), "magpie-haiku55-test-"));
+const root = await mkdtemp(join(tmpdir(), "magpie-opendesign-fix-test-"));
 const config = join(root, "config");
 await mkdir(join(config, "magpie"), { recursive: true });
 const captured = [];
@@ -78,7 +78,9 @@ const reservation = createServer();
 await new Promise((r) => reservation.listen(0, "127.0.0.1", r));
 const port = reservation.address().port;
 await new Promise((r) => reservation.close(r));
-const env = { ...process.env, XDG_CONFIG_HOME: config, XDG_CACHE_HOME: join(root, "cache"), MAGPIE_ADDR: `127.0.0.1:${port}`, MAGPIE_PLUGIN_MARKET: "off" };
+const env = { PATH: process.env.PATH, HOME: root, TMPDIR: tmpdir(), LANG: "en_US.UTF-8",
+  XDG_CONFIG_HOME: config, XDG_CACHE_HOME: join(root, "cache"), MAGPIE_NO_ACCOUNTS: "1",
+  MAGPIE_ADDR: `127.0.0.1:${port}`, MAGPIE_PLUGIN_MARKET: "off" };
 const plugin = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const command = (args) => new Promise((resolvePromise, reject) => {
   const child = spawn(bin, args, { env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -121,28 +123,34 @@ try {
   const user = [{ role: "user", content: "Reply OK" }];
   for (const stream of [false, true]) {
     const body = await send("messages", "native/claude-haiku-5.5", { messages: user, max_tokens: 1024, stream, thinking: { type: "enabled", budget_tokens: 1024 }, output_config: { effort: "high" } });
-    assert.deepEqual(body.thinking, { type: "adaptive" });
-    assert.equal(body.output_config.effort, "high");
-    console.log(`PASS packaged moejs native adaptive; stream=${stream}`);
+    assert.deepEqual(body.thinking, { type: "disabled" });
+    assert.equal(body.output_config, undefined);
+    assert.equal(body.reasoning, undefined);
+    console.log(`PASS packaged moejs native thinking disabled; stream=${stream}`);
   }
-  const chat = await send("chat/completions", "chat/claude-haiku-5.5", { messages: user, reasoning_effort: "ultra" });
-  assert.equal(chat.reasoning_effort, "max");
-  assert.deepEqual(chat.thinking, { type: "adaptive" });
-  console.log("PASS packaged moejs Chat adaptive parameters");
+  for (const stream of [false, true]) {
+    const chat = await send("chat/completions", "chat/claude-haiku-5.5", { messages: user, reasoning_effort: "ultra", stream });
+    assert.ok(chat.reasoning_effort === undefined || chat.reasoning_effort === "none");
+    assert.ok(chat.thinking === undefined || chat.thinking.type === "disabled");
+    assert.equal(chat.output_config, undefined);
+    console.log(`PASS packaged moejs Chat thinking disabled; stream=${stream}`);
+  }
 
   await writeFile(pluginsFile, JSON.stringify({ plugins: [{ spec: plugin, options: { mode: "disabled" } }] }));
   await new Promise((r) => setTimeout(r, 1600));
   for (const provider of ["native", "chat"]) {
+    for (const stream of [false, true]) {
     for (const [path, fields] of [
       ["messages", { messages: user, max_tokens: 1024, thinking: { type: "enabled", budget_tokens: 1024 } }],
       ["chat/completions", { messages: user, reasoning_effort: "high" }],
       ["responses", { input: "Reply OK", reasoning: { effort: "high" } }]
     ]) {
-      const body = await send(path, `${provider}/claude-haiku-5.5`, fields);
+      const body = await send(path, `${provider}/claude-haiku-5.5`, { ...fields, stream });
       if (provider === "native") assert.ok(body.thinking === undefined || body.thinking.type === "disabled");
       else assert.ok(body.reasoning_effort === undefined || body.reasoning_effort === "none");
       assert.notEqual(body.thinking?.type, "enabled");
-      console.log(`PASS packaged moejs disabled; ${path} -> ${provider}`);
+      console.log(`PASS packaged moejs disabled; ${path} -> ${provider}; stream=${stream}`);
+    }
     }
   }
   if (process.argv.includes("--live")) {
@@ -163,9 +171,14 @@ try {
     liveKey = undefined;
   }
   assert.doesNotMatch(gatewayLog, /middleware.*(?:error|failed|panic)/i);
-  console.log(`Sandbox retained at ${root}`);
+  console.log("PASS packaged gateway: all 16 local transport/content checks");
 } finally {
-  gateway?.kill();
+  if (gateway && gateway.exitCode === null) {
+    const ended = new Promise(resolvePromise => gateway.once("close", resolvePromise));
+    gateway.kill();
+    await ended;
+  }
   upstream.closeAllConnections();
   await new Promise((r) => upstream.close(r));
+  await rm(root, { recursive: true, force: true });
 }
